@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Translation System</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            text-align: center;
+            padding: 40px;
+            background-color: #f2f2f2;
+            margin: 0;
+        }
+        h2 {
+            color: #34495e;
+            font-size: 36px;
+            margin-bottom: 30px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch; /* makes inner items like box stretch full width */
+            justify-content: space-between;
+            margin: 20px;
+            width: 320px;
+            border-radius: 12px;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        .container:hover {
+            transform: scale(1.05);
+            box-shadow: 0px 12px 30px rgba(0, 0, 0, 0.15);
+        }
+        .language-dropdown {
+            margin-bottom: 15px;
+            font-size: 16px;
+            padding: 10px;
+            width: 100%;
+            border-radius: 8px;
+            border: 2px solid #3498db;
+            background-color: #fafafa;
+            transition: all 0.3s;
+        }
+        .language-dropdown:focus {
+            border-color: #2980b9;
+            outline: none;
+        }
+        .box {
+            width: 86%;
+            height: 180px;
+            border: 2px solid #3498db;
+            border-radius: 12px;
+            padding: 20px;
+            cursor: pointer;
+            font-size: 18px;
+            background-color: #ecf0f1;
+            transition: background-color 0.3s, color 0.3s;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+            color: #34495e;
+        }
+        .box:hover {
+            background-color: #3498db;
+            color: white;
+        }
+        .active {
+            background-color: #e67e22;
+            color: white;
+            font-weight: bold;
+        }
+        .text-area {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #34495e;
+        }
+        #status {
+            margin-top: 30px;
+            font-size: 20px;
+            color: #27ae60;
+            font-weight: bold;
+        }
+        #restart-btn {
+            margin-top: 40px;
+            padding: 14px 30px;
+            font-size: 18px;
+            cursor: pointer;
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            transition: background-color 0.3s;
+        }
+        #restart-btn:hover {
+            background-color: #c0392b;
+        }
+        .detected-language {
+            font-size: 16px;
+            margin-top: 12px;
+            color: #2980b9;
+        }
+        .card-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .card-container .container {
+            width: 320px;
+            max-width: 100%; /* Prevents containers from exceeding the available width */
+        }
+    </style>
+</head>
+<body>
+    <h2>Voice Translation System</h2>
+
+    <div class="card-container">
+        <div class="container">
+            <label for="person1-language">Select Language for Person 1:</label><br>
+            <select id="person1-language" class="language-dropdown">
+                <option value="None">Choose Language</option>
+                <option value="telugu">Telugu</option>
+                <option value="hindi">Hindi</option>
+                <option value="tamil">Tamil</option>
+                <option value="kannada">Kannada</option>
+            </select>
+            <div id="person1-detected" class="detected-language"></div>
+            <div id="person1" class="box" onclick="record('person1')">
+                🎙️ Person 1 Speak
+                <div class="text-area" id="person1-original"></div>
+                <div class="text-area" id="person1-translation"></div>
+            </div>
+        </div>
+
+        <div class="container">
+            <label for="person2-language">Select Language for Person 2:</label><br>
+            <select id="person2-language" class="language-dropdown">
+                <option value="None">Choose Language</option>
+                <option value="telugu">Telugu</option>
+                <option value="hindi">Hindi</option>
+                <option value="tamil">Tamil</option>
+                <option value="kannada">Kannada</option>
+            </select>
+            <div id="person2-detected" class="detected-language"></div>
+            <div id="person2" class="box" onclick="record('person2')">
+                🎙️ Person 2 Speak
+                <div class="text-area" id="person2-original"></div>
+                <div class="text-area" id="person2-translation"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="status">Ready</div>
+
+    <button id="restart-btn" onclick="restart()">🔄 Restart Conversation</button>
+
+    <script>
+        function assignLanguage(person, lang) {
+            if (lang === "None") return;
+
+            fetch(`/select_language/${person}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lang })
+            })
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('status').textContent = data.message;
+
+                if (data.detected_language) {
+                    document.getElementById(`${person}-detected`).textContent = `Detected Language: ${data.detected_language}`;
+                }
+
+                if (data.both_assigned) {
+                    document.getElementById('status').textContent += " ✅ Both speakers ready!";
+                }
+            })
+            .catch(err => {
+                console.error("Language assign error:", err);
+                document.getElementById('status').textContent = "Error assigning language!";
+            });
+        }
+
+        document.getElementById('person1-language').addEventListener('change', function () {
+            assignLanguage('person1', this.value);
+        });
+
+        document.getElementById('person2-language').addEventListener('change', function () {
+            assignLanguage('person2', this.value);
+        });
+
+        function record(person) {
+            const box = document.getElementById(person);
+            const status = document.getElementById('status');
+            const language = document.getElementById(`${person}-language`).value;
+
+            box.classList.add('active');
+            status.textContent = `Recording ${person}...`;
+
+            const url = language !== "None" ? `/record/${person}?lang=${language}` : `/record/${person}`;
+
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    status.textContent = `Original: ${data.text} | Translated: ${data.translated}`;
+
+                    document.getElementById('person1-original').textContent = "";
+                    document.getElementById('person2-original').textContent = "";
+                    document.getElementById('person1-translation').textContent = "";
+                    document.getElementById('person2-translation').textContent = "";
+
+                    if (person === 'person1') {
+                        document.getElementById('person1-original').textContent = data.text;
+                        document.getElementById('person2-translation').textContent = data.translated;
+                    } else {
+                        document.getElementById('person2-original').textContent = data.text;
+                        document.getElementById('person1-translation').textContent = data.translated;
+                    }
+
+                    const audio = new Audio(data.audio_url);
+                    audio.play();
+                    audio.onended = () => {
+                        const filename = data.audio_url.split('/').pop();
+                        fetch(`/delete_audio/${filename}`);
+                    };
+                })
+                .catch(err => {
+                    status.textContent = `Error occurred for ${person}`;
+                    console.error(err);
+                })
+                .finally(() => {
+                    box.classList.remove('active');
+                });
+        }
+
+        function restart() {
+            fetch('/restart')
+                .then(response => response.text())
+                .then(() => {
+                    document.getElementById('person1-original').textContent = "";
+                    document.getElementById('person1-translation').textContent = "";
+                    document.getElementById('person2-original').textContent = "";
+                    document.getElementById('person2-translation').textContent = "";
+                    document.getElementById('status').textContent = "Ready";
+                });
+        }
+    </script>
+</body>
+</html>

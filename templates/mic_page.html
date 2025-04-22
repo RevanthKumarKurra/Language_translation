@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mic Silence Detector</title>
+    <meta charset="UTF-8" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 100px;
+        }
+        button {
+            padding: 12px 20px;
+            font-size: 16px;
+        }
+        #status {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+        #array-preview {
+            margin-top: 20px;
+            max-width: 90%;
+            font-size: 14px;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎙️ Speak Now (Stops on Silence)</h1>
+    <button onclick="startRecording()">Start Recording</button>
+    <p id="status">Awaiting input...</p>
+    <div id="array-preview"></div>
+
+    <script>
+        let audioContext, processor, input;
+
+        function startRecording() {
+            fetch("/", { method: "GET" });
+
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    audioContext = new AudioContext({ sampleRate: 22000 });
+                    input = audioContext.createMediaStreamSource(stream);
+                    processor = audioContext.createScriptProcessor(2048, 1, 1);
+
+                    processor.onaudioprocess = function (e) {
+                        const chunk = e.inputBuffer.getChannelData(0);
+                        const float32 = new Float32Array(chunk);
+
+                        fetch("/", {
+                            method: "POST",
+                            body: float32.buffer
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            document.getElementById("status").textContent = "Status: " + data.status;
+
+                            if (data.status === "done") {
+                                stopRecording();
+                                console.log("Final audio array:", data.array);
+
+                                // Display a portion of array on screen
+                                const preview = data.array.slice(0, 300).map(n => n.toFixed(4));
+                                document.getElementById("array-preview").textContent =
+                                    `Audio Array [first 300 values]:\n[ ${preview.join(", ")} ... ]`;
+                            }
+                        });
+                    };
+
+                    input.connect(processor);
+                    processor.connect(audioContext.destination);
+                })
+                .catch(err => {
+                    alert("Microphone access denied.");
+                    console.error(err);
+                });
+        }
+
+        function stopRecording() {
+            if (processor && input && audioContext) {
+                processor.disconnect();
+                input.disconnect();
+                audioContext.close();
+            }
+        }
+    </script>
+</body>
+</html>
